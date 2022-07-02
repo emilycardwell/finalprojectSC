@@ -1,0 +1,480 @@
+s.options.numOutputBusChannels_(4);
+s.options.numOutputBusChannels;
+
+-----
+
+(
+
+SynthDef(\looper,{ arg sampbuf = 5, rate = 1, startPos = 0, endPos = 1.0, loop = 1,
+	dur, amp = 1, outBus, effBus, tri, line, reg,
+	trixpos, triypos, stxpos, endxpos, durxpos, stypos, endypos, durypos, unxpos, unypos,
+	eff1Amp = 0, eff2Amp = 0, eff3Amp = 0, eff4Amp = 0, gate = 1;
+	var thisRate, thisDur, loopFrq, sig, env, gen;
+	env = Env.adsr(4, 20, amp, 6, amp*1.1, [4, 2, -4]);
+	gen = EnvGen.kr(env, gate, doneAction: Done.freeSelf);
+	thisRate = BufRateScale.kr(sampbuf) * rate;
+	thisDur = ((endPos - startPos).abs * BufDur.kr(sampbuf));
+	loopFrq = (thisDur.reciprocal).min(100);
+	sig = PlayBuf.ar(1,
+			sampbuf,
+			thisRate,
+			Impulse.kr(loopFrq*loop),
+			startPos*BufFrames.kr(sampbuf),
+			loop);
+	sig = sig * gen;
+	Out.ar(effBus, [sig*eff1Amp, sig*eff2Amp, sig*eff3Amp, sig*eff4Amp]);
+	tri*Out.ar(outBus, Pan4.ar(sig, LFTri.kr(trixpos), LFTri.kr(triypos), amp));
+	line*Out.ar(outBus, Pan4.ar(sig, Line.kr(stxpos, endxpos, durxpos), Line.kr(stypos, endypos, durypos), amp));
+	reg*Out.ar(outBus, Pan4.ar(sig, unxpos, unypos, amp))
+}).add;
+
+SynthDef(\normDelay,{ arg inBus = 16, maxdelay = 8, delay = 0.25, amp = 0.5;
+	Out.ar(0, DelayN.ar(In.ar(inBus, 2), maxdelay, delay, amp).dup)
+}).add;
+
+SynthDef(\reVerb,{ arg inBus = 16, mix = 1, room = 0.3, damp = 0.5, amp = 0.5;
+	Out.ar(0, FreeVerb.ar(In.ar(inBus, 2), mix, room, damp, amp).dup)
+}).add;
+
+SynthDef(\rbpFlt,{ arg inBus = 16, freq = 440, decay = 0.5, amp = 0.25;
+	Out.ar(0, Ringz.ar(In.ar(inBus, 2), freq, decay, amp).dup);
+}).add;
+
+SynthDef(\combDelay,{ arg inBus = 16, delay = 0.5, decay = 4, amp = 1;
+	Out.ar(0, CombN.ar(In.ar(inBus, 2), 1, delay, decay, amp).dup)
+}).add;
+
+~synthGroup = Group.basicNew(s, 1);
+~effGroup = Group.after(~synthGroup);
+~effBus = (
+	delay: Bus.audio(s,1), verb: Bus.audio(s,1), rbp: Bus.audio(s,1), comb: Bus.audio(s,1),
+	masterdyn: Bus.audio(s,1), masterrvb: Bus.audio(s,1)
+          );
+)
+
+(
+var b5, b6, b7, b8, b9, b10, b11;
+
+b5 = Buffer.read(s, "/Volumes/GoogleDrive/My Drive/Mills/Computer Music/Final Project/Audio for SC/Mono clips/Environment/aspens.wav", numFrames: 48000*10, bufnum: 5);
+b6 = Buffer.read(s, "/Volumes/GoogleDrive/My Drive/Mills/Computer Music/Final Project/Audio for SC/Mono clips/Environment/birds.wav", numFrames: 48000*10, bufnum: 6);
+b7 = Buffer.read(s, "/Volumes/GoogleDrive/My Drive/Mills/Computer Music/Final Project/Audio for SC/Mono clips/Environment/crickets.wav", numFrames: 48000*10, bufnum: 7);
+b8 = Buffer.read(s, "/Volumes/GoogleDrive/My Drive/Mills/Computer Music/Final Project/Audio for SC/Mono clips/Environment/forest.wav", numFrames: 48000*10, bufnum: 8);
+b9 = Buffer.read(s, "/Volumes/GoogleDrive/My Drive/Mills/Computer Music/Final Project/Audio for SC/Mono clips/Environment/walking.wav", numFrames: 48000*10, bufnum: 9);
+b10 = Buffer.read(s, "/Volumes/GoogleDrive/My Drive/Mills/Computer Music/Final Project/Audio for SC/Mono clips/Environment/growling.wav", numFrames: 48000*10, bufnum: 10);
+b11 = Buffer.read(s, "/Volumes/GoogleDrive/My Drive/Mills/Computer Music/Final Project/Audio for SC/Mono clips/singing/oohs.wav", numFrames: 48000*5, bufnum: 11);
+
+Pdef(\environment,
+	Ppar([
+		Ppar([
+			Pdef(\aspens,
+				Pbind(
+					\instrument, \looper,
+					\sampbuf, b5,
+					\startPos, 0,
+					\endPos, 10,
+					\amp, 2,
+					\dur, Pseq([Rest(300), 150]),
+					\tri, 0,
+					\line, 1,
+					\reg, 0,
+					\stxpos, 0,
+					\endxpos, 0,
+					\durxpos, 20,
+					\stypos, 1,
+					\endypos, -1,
+					\durypos, 20,
+					\effBus, ~effBus[\verb].index,
+					\eff4Amp, 0.5
+				),
+				Pmono(
+					\reVerb,
+					\group, ~effGroup,
+					\inBus, ~effBus[\verb].index,
+					\room, 8,
+					\damp, 4,
+					\amp, 1
+				)
+		)]),
+		Ppar([
+			Pdef(\birds,
+				Pbind(
+					\instrument, \looper,
+					\sampbuf, b6,
+					\startPos, 0,
+					\endPos, 10,
+					\amp, 1,
+					\dur, Pseq([Rest(250), 100]),
+					\tri, 0,
+					\line, 0,
+					\reg, 1,
+					\unxpos, -1,
+					\unypos, 1,
+					\effBus, ~effBus[\delay].index,
+					\eff4Amp, 0.75
+				),
+				Pmono(
+					\normDelay,
+					\group, ~effGroup,
+					\inBus, ~effBus[\delay].index,
+					\delay, 1,
+					\amp, 1
+				)
+		)]),
+		Ppar([
+			Pdef(\crickets,
+				Pbind(
+					\instrument, \looper,
+					\sampbuf, b7,
+					\startPos, 0,
+					\endPos, 10,
+					\amp, 1,
+					\dur, Pseq([Rest(350), 50]),
+					\tri, 0,
+					\line, 0,
+					\reg, 1,
+					\unxpos, 1,
+					\unypos, 1,
+					\effBus, ~effBus[\comb].index,
+					\eff4Amp, 0.75
+				),
+				Pmono(
+					\combDelay,
+					\group, ~effGroup,
+					\inBus, ~effBus[\comb].index,
+					\delay, 0.2,
+					\decay, 2,
+					\amp, 1
+				)
+		)]),
+		Ppar([
+			Pdef(\forest,
+				Pbind(
+					\instrument, \looper,
+					\sampbuf, b8,
+					\startPos, 0,
+					\endPos, 10,
+					\amp, 1,
+					\dur, Pseq([Rest(200), 200]),
+					\tri, 0,
+					\line, 1,
+					\reg, 0,
+					\stxpos, 0,
+					\endxpos, 0,
+					\durxpos, 20,
+					\stypos, -1,
+					\endypos, 1,
+					\durypos, 25,
+					\effBus, ~effBus[\rbp].index,
+					\eff4Amp, 0.5
+				),
+				Pmono(
+					\rbpFlt,
+					\group, ~effGroup,
+					\inBus, ~effBus[\rbp].index,
+					\freq, Prand([440, 300, 100, 800, 750, 1200], inf),
+					\decay, 2,
+					\amp, 1
+				)
+		)]),
+		Ppar([
+			Pdef(\walking,
+				Pbind(
+					\instrument, \looper,
+					\sampbuf, b9,
+					\startPos, 0,
+					\endPos, 10,
+					\dur, 410,
+					\amp, 1,
+					\tri, 1,
+					\line, 0,
+					\reg, 0,
+					\trixpos, 0.05,
+					\triypos, 0.05,
+					\effBus, ~effBus[\delay].index,
+					\eff4Amp, 0.5,
+				),
+				Pmono(
+					\normDelay,
+					\group, ~effGroup,
+					\inBus, ~effBus[\delay].index,
+					\delay, 2,
+					\decay, 4,
+					\amp, 1
+				)
+		)]),
+		Ppar([
+			Pdef(\growling,
+				Pbind(
+					\instrument, \looper,
+					\sampbuf, b10,
+					\startPos, 0,
+					\endPos, 10,
+					\amp, 0.2,
+					\dur, Pseq([Rest(225), 25, Rest(75), 25]),
+					\tri, 0,
+					\line, 0,
+					\reg, 1,
+					\unxpos, 1,
+					\unypos, -1,
+					\effBus, ~effBus[\comb].index,
+					\eff4Amp, 0.75
+				),
+				Pmono(
+					\combDelay,
+					\group, ~effGroup,
+					\inBus, ~effBus[\comb].index,
+					\delay, 0.1,
+					\decay, 10,
+					\amp, 1
+				)
+		)]),
+		Pdef(\oohs,
+			Pbind(
+				\instrument, \looper,
+				\sampbuf, b11,
+				\startPos, 0,
+				\endPos, 5,
+				\amp, 1,
+				\dur, Pseq([Rest(25), 100, Rest(125), 50]),
+				\tri, 1,
+				\line, 0,
+				\reg, 0,
+				\trixpos, 0,
+				\triypos, 0.01
+		))
+	])
+);
+)
+
+Pdef(\environment).play;
+Pdef(\environment).stop;
+
+
+---------
+
+
+(
+
+SynthDef(\waves,{
+	arg freq = 60, rq = 1, panspeed, amp = 0.5, legato, dur = 5, wavecombdelay, outBus = 0,
+	effBus = 16, eff1Amp = 0, eff2Amp = 0, eff3Amp = 0, eff4Amp = 0, gate = 1;
+	var sig, env, wave;
+	sig = BPF.ar(BrownNoise.ar, freq, rq);
+	env = EnvGen.kr(Env.adsr(1, 3, 0.1, 1, 0.2, [2, -3]), gate, doneAction: 2);
+	wave = sig * env;
+	Out.ar(effBus, [wave*eff1Amp, wave*eff2Amp, wave*eff3Amp, wave*eff4Amp]);
+	Out.ar(outBus, PanAz.ar(4, wave*amp, LFSaw(panspeed)))
+}).add;
+
+SynthDef(\bass,{
+	arg dur = 5, amp = 0.2, xpos, ypos, freq;
+	var bass, env, sig;
+	sig = SinOsc.ar([freq,freq*1.5]);
+	env = EnvGen.kr(Env.perc(0.02, 4, 0.4, \sine), doneAction: 2);
+	bass = sig * env;
+	Out.ar(0, Pan4.ar(bass, xpos, ypos, amp))
+}).add;
+
+SynthDef(\normDelay,{ arg inBus = 16, maxdelay = 0.5, delay = 0.25, amp = 0.5;
+	Out.ar(0, DelayN.ar(In.ar(inBus, 1), maxdelay, delay, amp).dup)
+}).add;
+
+SynthDef(\reVerb,{ arg inBus = 16, mix = 1, room = 0.3, damp = 0.5, amp = 0.5;
+	Out.ar(0, FreeVerb.ar(In.ar(inBus, 1), mix, room, damp, amp).dup)
+}).add;
+
+SynthDef(\rbpFlt,{ arg inBus = 16, freq = 440, decay = 0.5, amp = 0.25;
+	Out.ar(0, Ringz.ar(In.ar(inBus, 1), freq, decay, amp).dup);
+}).add;
+
+SynthDef(\combDelay,{ arg inBus = 16, delay = 0.5, decay = 4, amp = 1;
+	Out.ar(0, CombN.ar(In.ar(inBus, 1), 1, delay, decay, amp).dup)
+}).add;
+
+~synthGroup = Group.basicNew(s, 1);
+~effGroup = Group.after(~synthGroup);
+
+~effBus = (
+	delay: Bus.audio(s,1), verb: Bus.audio(s,1), rbp: Bus.audio(s,1), comb: Bus.audio(s,1),
+	masterdyn: Bus.audio(s,1), masterrvb: Bus.audio(s,1)
+          );
+)
+
+(
+Pdef(\a,
+	Ppar([
+		Ppar([
+			Pbind(
+				\instrument, \waves,
+				\group, ~synthGroup,
+				\dur, Pwhite(6, 15, inf),
+				\amp, 0.5,
+				\legato, 0.9,
+				\pan,Pseq([-1.0,-0.75,-0.5,-0.25,0,0.25,0.5,0.75,1].dup.reverse.flatten,inf),
+				\freq, Pwhite(20, 800, inf),
+				\panspeed, 0.002,
+				\effBus, ~effBus[\delay].index,
+				\eff4Amp, 0.75
+			),
+			Pmono(
+				\combDelay,
+				\group, ~effGroup,
+				\inBus, ~effBus[\comb].index,
+				\delay, Pseq([0.5, Pwhite(0.00, 1.00, 30), 0.1], inf),
+				\decay, 6,
+				\amp, 0.5
+			),
+		]),
+		Pbind(
+			\instrument, \bass,
+			\dur, 4.5,
+			\freq, Pseq([40, 40, 30, 30, 40, 40, 30, 30, 20, 20, 20, 20], inf),
+			\xpos, 0,
+			\ypos, 0,
+			\amp, 0.2
+		)
+	])
+));
+
+Pdef(\a).play;
+
+
+-----------------
+
+
+(
+var w, b0, b1, b2, b3, b4, synth, sendbufslider, ampslider, trigslider, graindurslider, speedslider, posslider, bpffreqslider, rqslider, ffreqslider1, fampslider1, ffreqslider2, fampslider2, ffreqslider3, fampslider3;
+
+w = Window("Vocal Processor", Rect(100, 400, 400, 600));
+w.view.decorator = FlowLayout(w.view.bounds);
+
+s = Server.local;
+
+b0 = Buffer.read(s, "/Volumes/GoogleDrive/My Drive/Mills/Computer Music/Final Project/Audio for SC/Mono clips/singing/little deer.wav", numFrames: 48000, bufnum: 0);
+b1 = Buffer.read(s, "/Volumes/GoogleDrive/My Drive/Mills/Computer Music/Final Project/Audio for SC/Mono clips/singing/we like to rummage in the maize.wav", numFrames: 48000*6, bufnum: 1);
+b2 = Buffer.read(s, "/Volumes/GoogleDrive/My Drive/Mills/Computer Music/Final Project/Audio for SC/Mono clips/singing/and then we go to the watering hole.wav", numFrames: 48000*5, bufnum: 2);
+b3 = Buffer.read(s, "/Volumes/GoogleDrive/My Drive/Mills/Computer Music/Final Project/Audio for SC/Mono clips/singing/a good time with our friends in the forest.wav", numFrames: 48000*5, bufnum: 3);
+b4 = Buffer.read(s, "/Volumes/GoogleDrive/My Drive/Mills/Computer Music/Final Project/Audio for SC/Mono clips/singing/laughter.wav", numFrames: 48000*5, bufnum: 4);
+
+synth = SynthDef(\littledeer,
+	{arg trigger = 0, graindur = 0.2, sndbuf = 0, speed = 1, plbkpos = 0, envbuf = -1,
+	famp1 = 1, famp2 = 1, famp3 = 1, ffreq1 = 440, ffreq2 = 440, ffreq3 = 440,
+	bpffreq = 90, rq = 0.1, pan = 0, amp = 1, xpos = 0, ypos = 0, gate = 1;
+	var env, send;
+	env = EnvGen.kr(Env.adsr(0.1, 3, 0.6, 6, 1, [2, -3]), gate, doneAction: 2);
+	send = GrainBuf.ar(
+		numChannels: 2,
+		trigger: Impulse.kr(trigger),
+		dur: graindur,
+		sndbuf: sndbuf,
+		rate: speed,
+		pos: plbkpos,
+		pan: 0,
+		envbufnum: envbuf);
+    send = GVerb.ar(BPF.ar(send, bpffreq, rq), 2, 0.1, 0, 1, 3, 0.5, 0.2);
+	send = send + FreqShift.ar(send, ffreq1, mul: famp1);
+	Out.ar(pan, Pan4.ar(send*env, xpos, ypos, amp))
+}).play;
+
+ampslider = EZSlider(w, 300@50, "amp", ControlSpec(0, 2, 'linear', 0.02, 1), {|ez|  synth.set(\amp, ez.value)});
+w.view.decorator.nextLine;
+
+sendbufslider = EZSlider(w, 300@50, "sndbuf", ControlSpec(0, 4, 'linear', 1, 0), {|ez|  synth.set(\sndbuf, ez.value)});
+w.view.decorator.nextLine;
+
+graindurslider = EZSlider(w, 300@50, "graindur", ControlSpec(0.05, 6, 'linear', 0.05, 2), {|ez|  synth.set(\graindur, ez.value)});
+w.view.decorator.nextLine;
+
+trigslider = EZSlider(w, 300@50, "trigger", ControlSpec(0, 10, 'linear', 0.2, 1), {|ez|  synth.set(\trigger, ez.value)});
+w.view.decorator.nextLine;
+
+posslider = EZSlider(w, 300@50, "plbkpos", ControlSpec(0, 6, 'linear', 0.05, 0), {|ez|  synth.set(\plbkpos, ez.value)});
+w.view.decorator.nextLine;
+
+speedslider = EZSlider(w, 300@50, "speed", ControlSpec(-3, 3, 'linear', 0.5, 1), {|ez|  synth.set(\speed, ez.value)});
+w.view.decorator.nextLine;
+
+bpffreqslider = EZSlider(w, 300@50, "bpffreq", ControlSpec(40, 1800, 'exponential', 10, 40), {|ez|  synth.set(\bpffreq, ez.value)});
+w.view.decorator.nextLine;
+
+rqslider = EZSlider(w, 300@50, "rq", ControlSpec(0, 1, 'linear', 0.05, 1), {|ez|  synth.set(\rq, ez.value)});
+w.view.decorator.nextLine;
+
+fampslider1 = EZSlider(w, 300@50, "famp1", ControlSpec(0, 1, 'linear', 0.02, 0), {|ez|  synth.set(\famp1, ez.value)});
+w.view.decorator.nextLine;
+
+ffreqslider1 = EZSlider(w, 300@50, "ffreq1", ControlSpec(40, 1500, 'exponential', 10, 40), {|ez|  synth.set(\ffreq1, ez.value)});
+
+
+MIDIIn.connectAll;
+MIDIdef.cc(\guiCtl,{ arg val, num, chan;
+	switch(num.postln,
+		0,{ { ampslider.valueAction_(ampslider.controlSpec.map(val/127)) }.defer },
+		16,{ { sendbufslider.valueAction_(sendbufslider.controlSpec.map(val/127)) }.defer },
+		1,{ { graindurslider.valueAction_(graindurslider.controlSpec.map(val/127)) }.defer },
+		17,{ { trigslider.valueAction_(trigslider.controlSpec.map(val/127)) }.defer },
+		2,{ { posslider.valueAction_(posslider.controlSpec.map(val/127)) }.defer },
+		18,{ { speedslider.valueAction_(speedslider.controlSpec.map(val/127)) }.defer },
+		3,{ { bpffreqslider.valueAction_(bpffreqslider.controlSpec.map(val/127)) }.defer },
+		19,{ { rqslider.valueAction_(rqslider.controlSpec.map(val/127)) }.defer },
+		4,{ { fampslider1.valueAction_(fampslider1.controlSpec.map(val/127))}.defer },
+		20,{ { ffreqslider1.valueAction_(ffreqslider1.controlSpec.map(val/127)) }.defer })
+}).fix(true);
+
+w.front.onClose_({ synth.free });
+
+)
+
+
+-----------
+
+
+(
+
+var w2, b12, synth, freqslider, ampslider, freqampslider;
+
+w = Window("Vocal Processor", Rect(100, 400, 350, 200));
+w.view.decorator = FlowLayout(w.view.bounds);
+
+s = Server.local;
+b12 = Buffer.alloc(s, 44100 * 1.0, 1, bufnum: 12);
+
+synth = {arg trigger = 0, graindur = 0.2, sndbuf = 12, transp = 1, pos = 0, pan = 0, envbuf = -1, amp = 1,
+	freq = 440, freqshiftamp = 0.02, gate = 1;
+	var env, send;
+	RecordBuf.ar(SoundIn.ar(0), sndbuf, loop: 1);
+	env = EnvGen.kr(Env.adsr(0.1, 3, 0.6, 6, 1, [2, -3]), gate, doneAction: 2);
+	send = GrainBuf.ar(
+		numChannels: 1,
+		trigger: Impulse.kr(trigger),
+		dur: graindur,
+		sndbuf: sndbuf,
+		rate: transp,
+		pos: pos,
+		pan: pan,
+		envbufnum: envbuf);
+    send = GVerb.ar(BPF.ar(send, 90.midicps), roomsize: 30, revtime: 8, drylevel: 0.5);
+    send = send!2 * 0.8 + (SoundIn.ar([0,1]) * 0.5);
+	send = send + FreqShift.ar(send, freq, mul: freqshiftamp);
+	Out.ar(0, Pan4.ar(send, 0, 0, amp))
+}.play;
+
+ampslider = EZSlider(w, 300@50, "amp", ControlSpec(0, 1, 'linear', 0.05, 1), {|ez|  synth.set(\amp, ez.value)});
+w.view.decorator.nextLine;
+
+freqslider = EZSlider(w, 300@50, "freq", ControlSpec(60, 1000, 'exponential', 10, 440), {|ez|  synth.set(\freq, ez.value)});
+w.view.decorator.nextLine;
+
+freqampslider = EZSlider(w, 300@50, "freqshiftamp", ControlSpec(0, 1, 'linear', 0.05, 0.5), {|ez|  synth.set(\freqshiftamp, ez.value)});
+
+w.front.onClose_({ synth.free });
+
+)
+
+-----------
+
+Pdef(\a).stop;
+Pdef(\a).free;
+
+Pdef(\environment).stop;
+Pdef.clear
